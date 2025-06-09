@@ -7,5 +7,12 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true, // Esto evita que Vite busque otro puerto si el 5174 está ocupado
+    proxy: {
+      '/api/chat': {
+        target: 'http://localhost:11434',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/chat/, '/api/chat')
+      }
+    }
   },
 })
