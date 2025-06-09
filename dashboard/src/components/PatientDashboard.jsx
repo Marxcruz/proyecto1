@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
+import AIChatWindow from "./AIChatWindow"; // Importar el nuevo componente de chat
 import axios from "axios";
 import { Context } from "../main";
 import { toast } from "react-toastify";
@@ -19,6 +20,7 @@ const PatientDashboard = () => {
   // Estado para la interfaz y navegación
   const [activeTab, setActiveTab] = useState('dashboard');
   const [darkMode, setDarkMode] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false); // Estado para la ventana de chat
   
   // Estado para los datos
   const [appointments, setAppointments] = useState([]);
@@ -289,6 +291,21 @@ const PatientDashboard = () => {
           </div>
         </div>
       </div>
+      
+      {/* Botón flotante para el chat con IA */}
+      <button
+        onClick={() => setIsChatOpen(prev => !prev)} // Alternar la visibilidad de la ventana de chat
+        className={`fixed bottom-6 right-6 text-white p-4 rounded-full shadow-xl z-50 focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all duration-150 ease-in-out flex items-center justify-center ${darkMode ? 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-400' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'}`}
+        aria-label="Abrir chat con IA"
+        title="Chatear con Asistente IA"
+      >
+        <FaCommentMedical size={24} />
+      </button>
+
+      {/* Ventana de Chat con IA */}
+      {isChatOpen && (
+        <AIChatWindow onClose={() => setIsChatOpen(false)} darkMode={darkMode} />
+      )}
     </div>
   );
 };
