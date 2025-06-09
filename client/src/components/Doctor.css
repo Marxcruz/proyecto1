@@ -1,0 +1,90 @@
+/* Estilos para la sección de doctores */
+.doctors-section {
+  background-color: #f8f9fa;
+  padding: 40px 0;
+}
+
+/* Grid para mostrar los doctores horizontalmente */
+.doctors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 30px;
+  margin-top: 30px;
+}
+
+/* Estilos para cada tarjeta de doctor */
+.doctor-item {
+  background-color: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.doctor-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Contenedor de la imagen */
+.doctor-image {
+  height: 250px;
+  overflow: hidden;
+}
+
+/* Estilo de la imagen */
+.doctor-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.doctor-item:hover .doctor-image img {
+  transform: scale(1.05);
+}
+
+/* Información del doctor */
+.doctor-info {
+  padding: 20px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.doctor-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.doctor-specialty {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.doctor-contact {
+  font-size: 0.875rem;
+  color: #888;
+  margin-top: auto;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  .doctors-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .doctors-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
