@@ -85,7 +85,7 @@ const Sidebar = () => {
   return (
     <>
       <div
-        className={`fixed top-1/2 left-[10px] rounded-t-[5px] rounded-b-[7px] h-[370px] w-[60px] lg:w-[80px] 
+        className={`fixed top-1/2 left-[10px] rounded-t-[5px] rounded-b-[7px] h-[430px] w-[60px] lg:w-[80px] 
     bg-gray-900 p-4 transition-all duration-300 ease-in-out transform ${
       show ? "translate-x-0" : "-translate-x-full "
     } lg:translate-x-0 -translate-y-1/2 flex flex-col items-center justify-center z-50`}
