@@ -33,7 +33,14 @@ const url = process.env.MONGO_URL;
 // all middleware is here
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL, "http://localhost:5173", "http://localhost:5174"],
+    origin: [
+      process.env.FRONTEND_URL,
+      process.env.DASHBOARD_URL,
+      "http://localhost:3000",
+      "http://localhost:3030",
+      "http://localhost:5173",
+      "http://localhost:5174"
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Access-Control-Allow-Origin", "Cache-Control", "Pragma"],

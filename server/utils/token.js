@@ -20,6 +20,8 @@ export const jsontoken = (user, message, statusCode, res) => {
         Date.now() + process.env.COOKIE_EXPIRE * 24 * 60 * 60 * 1000
       ),
       httpOnly: true,
+      sameSite: "lax", // permite cookies cross-site en localhost y producción
+      secure: false,    // true si usas https
     })
     .json({
       success: true,

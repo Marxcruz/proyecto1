@@ -49,17 +49,28 @@ async function crearUsuario(tipo, datos) {
   let body, headers;
   if (tipo === "doctor") {
     const cleanDatos = { ...datos };
+    // Si doctorImage es un archivo, asegúrate de que va como FormData
     if (
-      !cleanDatos.doctorImage ||
-      (typeof cleanDatos.doctorImage === "string" && cleanDatos.doctorImage.trim().toLowerCase() === "omitir")
+      cleanDatos.doctorImage && typeof cleanDatos.doctorImage !== "string"
     ) {
-      delete cleanDatos.doctorImage;
-    }
-    if (cleanDatos.doctorImage) {
       body = new FormData();
-      Object.entries(cleanDatos).forEach(([k, v]) => body.append(k, v));
+      Object.entries(cleanDatos).forEach(([k, v]) => {
+        // Solo el campo doctorImage debe ser archivo, el resto string
+        if (k === "doctorImage" && v instanceof File) {
+          body.append("doctorImage", v);
+        } else {
+          body.append(k, v);
+        }
+      });
       headers = {};
     } else {
+      // Si el usuario escribió 'omitir' o no hay imagen, enviar JSON
+      if (
+        !cleanDatos.doctorImage ||
+        (typeof cleanDatos.doctorImage === "string" && cleanDatos.doctorImage.trim().toLowerCase() === "omitir")
+      ) {
+        delete cleanDatos.doctorImage;
+      }
       body = JSON.stringify(cleanDatos);
       headers = { "Content-Type": "application/json" };
     }
@@ -94,6 +105,7 @@ export default function ChatBot() {
   const [creationMode, setCreationMode] = useState(null); // "admin" | "doctor" | null
   const [creationStep, setCreationStep] = useState(0);
   const [creationData, setCreationData] = useState({});
+  const [selectedFile, setSelectedFile] = useState(null); // Para imagen de doctor
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -113,9 +125,14 @@ export default function ChatBot() {
     if (creationMode) {
       const step = CREATION_STEPS[creationMode][creationStep];
       let value = input.trim();
-      // Permitir omitir imagen del doctor (robusto a mayúsculas/minúsculas y espacios)
-      if (creationMode === "doctor" && step.key === "doctorImage" && value.replace(/\s+/g, '').toLowerCase() === "omitir") {
-        value = "omitir";
+      // Manejo especial para imagen del doctor
+      if (creationMode === "doctor" && step.key === "doctorImage") {
+        if (selectedFile) {
+          value = selectedFile;
+        } else if (value.replace(/\s+/g, '').toLowerCase() === "omitir") {
+          value = "omitir";
+        }
+        setSelectedFile(null); // Limpiar después de usar
       }
       setCreationData((prev) => ({ ...prev, [step.key]: value }));
       if (creationStep + 1 < CREATION_STEPS[creationMode].length) {
@@ -228,12 +245,63 @@ export default function ChatBot() {
               className="flex border-t border-gray-200 bg-white"
               onSubmit={sendMessage}
             >
+              {/* Si estamos en el paso de imagen del doctor, mostrar input file */}
+              {creationMode === "doctor" && CREATION_STEPS.doctor[creationStep]?.key === "doctorImage" && (
+  <>
+    <input
+      type="file"
+      accept="image/*"
+      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded mr-2"
+      onChange={e => {
+        setSelectedFile(e.target.files[0]);
+        setInput(e.target.files[0]?.name || "");
+      }}
+      style={{ maxWidth: 180 }}
+    />
+    <button
+      type="button"
+      className="ml-2 px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-sm"
+      disabled={!selectedFile}
+      onClick={() => {
+        if (!selectedFile) return;
+        // Avanzar flujo automáticamente con la imagen seleccionada
+        const step = CREATION_STEPS.doctor[creationStep];
+        let value = selectedFile;
+        setCreationData(prev => ({ ...prev, [step.key]: value }));
+        setSelectedFile(null);
+        setInput("");
+        if (creationStep + 1 < CREATION_STEPS.doctor.length) {
+          setCreationStep(creationStep + 1);
+          setTimeout(() => {
+            setMessages(prev => ([
+              ...prev,
+              { from: "bot", text: `Por favor, ingresa ${CREATION_STEPS.doctor[creationStep + 1].label}:` },
+            ]));
+          }, 300);
+        } else {
+          setTimeout(async () => {
+            setMessages(prev => ([...prev, { from: "bot", text: "Creando usuario..." }]));
+            let datosEnviar = { ...creationData, [step.key]: value };
+            const res = await crearUsuario("doctor", datosEnviar);
+            setMessages(prev => ([...prev, { from: "bot", text: res.message }]));
+            setCreationMode(null);
+            setCreationStep(0);
+            setCreationData({});
+          }, 500);
+        }
+      }}
+    >
+      Aceptar imagen
+    </button>
+  </>
+)}
               <input
                 className="flex-1 px-3 py-2 outline-none text-sm"
                 type="text"
                 placeholder="Escribe tu mensaje..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                disabled={creationMode === "doctor" && CREATION_STEPS.doctor[creationStep]?.key === "doctorImage" && selectedFile}
               />
               <button
                 type="submit"

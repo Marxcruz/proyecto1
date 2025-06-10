@@ -54,13 +54,30 @@ export const doctorTokenAuth = errorHandleMiddleware(async (req, res, next) => {
 // Admin TOKEN
 export const adminTokenAuth = errorHandleMiddleware(async (req, res, next) => {
   const token = req.cookies.adminToken;
+  console.log('Middleware adminTokenAuth:');
   if (!token) {
+    console.log('⛔ Cookie adminToken: Ausente');
     return next(new ErrorHandler("Administrador no autenticado", 400));
+  } else {
+    console.log('✅ Cookie adminToken: Presente');
   }
-  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-  req.user = await User.findById(decoded.id);
-  if (req.user.rol !== "Administrador") {
-    return next(new ErrorHandler("Administrador no autorizado", 403));
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    console.log('✅ Token decodificado:', decoded);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      console.log('⛔ Usuario no encontrado');
+      return next(new ErrorHandler("Usuario no encontrado", 404));
+    }
+    if (user.rol !== "Administrador") {
+      console.log(`⛔ Rol incorrecto: ${user.rol}, se esperaba: Administrador`);
+      return next(new ErrorHandler("Administrador no autorizado", 403));
+    }
+    req.user = user;
+    console.log('✅ Usuario autenticado como Administrador:', user.correo);
+    next();
+  } catch (error) {
+    console.log('⛔ Error al verificar token:', error.message);
+    return next(new ErrorHandler("Token inválido o expirado", 401));
   }
-  next();
-});
+})

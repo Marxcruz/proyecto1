@@ -131,21 +131,30 @@ export const createAdminController = errorHandleMiddleware(
 // crear nuevo Doctor
 export const createNewDoctorController = errorHandleMiddleware(
   async (req, res, next) => {
-    if (!req.files || Object.keys(req.files).length === 0) {
-      return next(new ErrorHandler("Se requieren imágenes del doctor", 404));
+    // Permitir que la imagen sea opcional
+    let doctorImage = null;
+    if (req.files && Object.keys(req.files).length > 0) {
+      doctorImage = req.files.docImage || req.files.imagenDoctor;
     }
-    
-    // Obtener la imagen del doctor - aceptar tanto docImage (del frontend) como imagenDoctor
-    const doctorImage = req.files.docImage || req.files.imagenDoctor;
-    
-    // Verificar que la imagen exista antes de acceder a su propiedad mimetype
-    if (!doctorImage) {
-      return next(new ErrorHandler("No se encontró la imagen del doctor", 404));
-    }
-    
-    const allowedFormats = ["image/png", "image/jpeg", "image/webp"];
-    if (!allowedFormats.includes(doctorImage.mimetype)) {
-      return next(new ErrorHandler("¡Formato de archivo no soportado!", 400));
+    let imagenCloudinary = null;
+    if (doctorImage && doctorImage.tempFilePath) {
+      const allowedFormats = ["image/png", "image/jpeg", "image/webp"];
+      if (!allowedFormats.includes(doctorImage.mimetype)) {
+        return next(new ErrorHandler("¡Formato de archivo no soportado!", 400));
+      }
+      // Subir a Cloudinary si hay imagen válida
+      imagenCloudinary = await cloudinary.uploader.upload(
+        doctorImage.tempFilePath
+      );
+      if (!imagenCloudinary || imagenCloudinary.error) {
+        console.log(
+          "Error de Cloudinary:",
+          imagenCloudinary.error || "Error desconocido de Cloudinary"
+        );
+        return next(
+          new ErrorHandler("Error al subir la imagen a Cloudinary", 404)
+        );
+      }
     }
     // Mapear los nombres de campos del frontend (inglés) a los nombres esperados en el backend (español)
     const nombre = req.body.firstName || req.body.nombre;
@@ -177,8 +186,7 @@ export const createNewDoctorController = errorHandleMiddleware(
       !genero ||
       !identificacion ||
       !fechaNacimiento ||
-      !departamentoMedico ||
-      !doctorImage
+      !departamentoMedico
     ) {
       return next(new ErrorHandler("Por favor complete todo el formulario", 400));
     }
@@ -188,18 +196,19 @@ export const createNewDoctorController = errorHandleMiddleware(
         new ErrorHandler(`Este correo ya está registrado como ${register.rol}`, 400)
       );
     }
-    // código para cloudinary
-    const cloudinaryResponse = await cloudinary.uploader.upload(
-      doctorImage.tempFilePath
-    );
-    if (!cloudinaryResponse || cloudinaryResponse.error) {
-      console.log(
-        "Error de Cloudinary:",
-        cloudinaryResponse.error || "Error desconocido de Cloudinary"
-      );
-      return next(
-        new ErrorHandler("Error al subir la imagen a Cloudinary", 404)
-      );
+
+    let imagenDoctor = null;
+    if (imagenCloudinary) {
+      imagenDoctor = {
+        public_id: imagenCloudinary.public_id,
+        url: imagenCloudinary.secure_url,
+      };
+    } else {
+      // Avatar por defecto si no hay imagen
+      imagenDoctor = {
+        public_id: "default_avatar",
+        url: "https://res.cloudinary.com/demo/image/upload/v1717980000/default-avatar-doctor.png"
+      };
     }
     const doctor = await User.create({
       nombre,
@@ -212,10 +221,7 @@ export const createNewDoctorController = errorHandleMiddleware(
       genero,
       rol: "Doctor",
       departamentoMedico,
-      imagenDoctor: {
-        public_id: cloudinaryResponse.public_id,
-        url: cloudinaryResponse.secure_url,
-      },
+      imagenDoctor,
     });
     res.status(201).send({
       success: true,
