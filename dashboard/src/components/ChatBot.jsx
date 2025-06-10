@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { FaRobot, FaPaperPlane } from "react-icons/fa";
+import ResizableChatWindow from "./ResizableChatWindow";
 
 const CREATION_STEPS = {
   admin: [
@@ -199,127 +200,57 @@ export default function ChatBot() {
       return;
     }
 
-    // Respuesta real de Llama 3
-    const aiText = await getLlama3Response(input);
+    // Solo responder si la pregunta es del sistema
+    function esPreguntaDelSistema(texto) {
+      const keywords = [
+        "doctor", "paciente", "administrador", "usuario", "cita", "departamento", "login", "registro",
+        "crear", "eliminar", "modificar", "hospital", "imagen", "correo", "contraseña", "teléfono",
+        "identificación", "departamento médico", "dashboard", "rol", "token", "autenticación", "historial", "especialidad"
+      ];
+      const lower = texto.toLowerCase();
+      return keywords.some(k => lower.includes(k));
+    }
+    if (!esPreguntaDelSistema(input)) {
+      setMessages((prev) => [
+        ...prev,
+        { from: "bot", text: "Solo puedo responder preguntas relacionadas con el sistema de gestión hospitalaria (usuarios, doctores, pacientes, citas, etc.)." }
+      ]);
+      return;
+    }
+    // Respuesta real de Llama 3, pero forzando contexto de sistema
+    const aiText = await getLlama3Response(
+      `Responde SOLO sobre el sistema de gestión hospitalaria. Si la pregunta no es relevante, di que no puedes responder. Pregunta: ${input}`
+    );
     setMessages((prev) => [...prev, { from: "bot", text: aiText }]);
   };
 
   return (
-    <>
-      {/* Burbuja flotante */}
-      <div
-        className="fixed bottom-8 right-8 z-[100] flex flex-col items-end"
-        style={{ pointerEvents: "auto" }}
-      >
-        {open && (
-          <div className="w-80 bg-white shadow-xl rounded-xl mb-2 border border-gray-200 flex flex-col overflow-hidden animate-fade-in">
-            <div className="bg-indigo-600 text-white px-4 py-2 flex items-center gap-2">
-              <FaRobot /> <span>Chat IA</span>
-              <button
-                className="ml-auto text-white hover:text-gray-200"
-                onClick={() => setOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="flex-1 px-4 py-2 h-64 overflow-y-auto bg-gray-50">
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`my-1 flex ${msg.from === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`px-3 py-2 rounded-lg max-w-[80%] text-sm ${
-                      msg.from === "user"
-                        ? "bg-indigo-100 text-indigo-800"
-                        : "bg-gray-200 text-gray-800"
-                    }`}
-                  >
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-            <form
-              className="flex border-t border-gray-200 bg-white"
-              onSubmit={sendMessage}
-            >
-              {/* Si estamos en el paso de imagen del doctor, mostrar input file */}
-              {creationMode === "doctor" && CREATION_STEPS.doctor[creationStep]?.key === "doctorImage" && (
-  <>
-    <input
-      type="file"
-      accept="image/*"
-      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded mr-2"
-      onChange={e => {
-        setSelectedFile(e.target.files[0]);
-        setInput(e.target.files[0]?.name || "");
-      }}
-      style={{ maxWidth: 180 }}
-    />
-    <button
-      type="button"
-      className="ml-2 px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-sm"
-      disabled={!selectedFile}
-      onClick={() => {
-        if (!selectedFile) return;
-        // Avanzar flujo automáticamente con la imagen seleccionada
-        const step = CREATION_STEPS.doctor[creationStep];
-        let value = selectedFile;
-        setCreationData(prev => ({ ...prev, [step.key]: value }));
-        setSelectedFile(null);
-        setInput("");
-        if (creationStep + 1 < CREATION_STEPS.doctor.length) {
-          setCreationStep(creationStep + 1);
-          setTimeout(() => {
-            setMessages(prev => ([
-              ...prev,
-              { from: "bot", text: `Por favor, ingresa ${CREATION_STEPS.doctor[creationStep + 1].label}:` },
-            ]));
-          }, 300);
-        } else {
-          setTimeout(async () => {
-            setMessages(prev => ([...prev, { from: "bot", text: "Creando usuario..." }]));
-            let datosEnviar = { ...creationData, [step.key]: value };
-            const res = await crearUsuario("doctor", datosEnviar);
-            setMessages(prev => ([...prev, { from: "bot", text: res.message }]));
-            setCreationMode(null);
-            setCreationStep(0);
-            setCreationData({});
-          }, 500);
-        }
-      }}
-    >
-      Aceptar imagen
-    </button>
-  </>
-)}
-              <input
-                className="flex-1 px-3 py-2 outline-none text-sm"
-                type="text"
-                placeholder="Escribe tu mensaje..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={creationMode === "doctor" && CREATION_STEPS.doctor[creationStep]?.key === "doctorImage" && selectedFile}
-              />
-              <button
-                type="submit"
-                className="px-4 text-indigo-600 hover:text-indigo-800"
-              >
-                <FaPaperPlane />
-              </button>
-            </form>
-          </div>
-        )}
+    <div className="fixed bottom-8 right-8 z-[100] flex flex-col items-end" style={{ pointerEvents: "auto" }}>
+      {open ? (
+        <ResizableChatWindow
+          messages={messages}
+          setMessages={setMessages}
+          onClose={() => setOpen(false)}
+          messagesEndRef={messagesEndRef}
+          creationMode={creationMode}
+          creationStep={creationStep}
+          CREATION_STEPS={CREATION_STEPS}
+          selectedFile={selectedFile}
+          setSelectedFile={setSelectedFile}
+          setInput={setInput}
+          sendMessage={sendMessage}
+          input={input}
+          setOpen={setOpen}
+        />
+      ) : (
         <button
           className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-lg flex items-center justify-center text-2xl"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => setOpen(true)}
           aria-label="Abrir chat IA"
         >
           <FaRobot />
         </button>
-      </div>
-    </>
+      )}
+    </div>
   );
 }
