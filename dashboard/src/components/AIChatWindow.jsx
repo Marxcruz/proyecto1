@@ -18,6 +18,19 @@ const AIChatWindow = ({ onClose, darkMode }) => {
 
   useEffect(scrollToBottom, [messages]);
 
+  // --- Filtro de preguntas del sistema hospitalario ---
+  function esPreguntaDelSistema(texto) {
+    const keywords = [
+      "doctor", "doctores", "paciente", "pacientes", "administrador", "usuario", "usuarios", "cita", "citas",
+      "departamento", "departamentos", "login", "registro", "crear", "eliminar", "modificar", "hospital",
+      "imagen", "correo", "contraseña", "teléfono", "identificación", "departamento médico", "dashboard", "rol",
+      "token", "autenticación", "historial", "especialidad", "receta", "recetas", "laboratorio", "resultados", "perfil",
+      "sistema", "gestión", "agendar", "cancelar", "consultar", "médico", "médicos"
+    ];
+    const lower = texto.toLowerCase();
+    return keywords.some(k => lower.includes(k));
+  }
+
   const handleSendMessage = async () => {
     if (inputText.trim() === '') return;
 
@@ -32,19 +45,39 @@ const AIChatWindow = ({ onClose, darkMode }) => {
     setInputText('');
     setIsAiTyping(true);
 
+    // --- Filtro antes de enviar a la IA ---
+    if (!esPreguntaDelSistema(newMessage.text)) {
+      setMessages(prevMessages => [...prevMessages, {
+        id: Date.now(),
+        text: 'Solo puedo responder preguntas relacionadas con el sistema de gestión hospitalaria (usuarios, doctores, pacientes, citas, etc.).',
+        sender: 'ai',
+        timestamp: new Date(),
+      }]);
+      setIsAiTyping(false);
+      return;
+    }
+
     try {
       // Usamos la misma lógica que el dashboard de administrador
       const response = await fetch("http://localhost:11434/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama3:latest", prompt: inputText, stream: false })
+        body: JSON.stringify({
+          model: "llama3:latest",
+          prompt: `IMPORTANTE: Responde ÚNICAMENTE sobre el sistema de gestión hospitalaria (usuarios, doctores, pacientes, citas, historial médico, recetas, resultados de laboratorio, etc). Si la pregunta NO es relevante, responde EXCLUSIVAMENTE: 'Solo puedo responder preguntas relacionadas con el sistema de gestión hospitalaria.' NO cuentes chistes, ni respondas temas generales, ni des información fuera del sistema hospitalario. Pregunta: ${newMessage.text}`,
+          stream: false
+        })
       });
       const data = await response.json();
       // Ollama responde con { response: "texto...", ... }
       const aiContent = data.response ? data.response.trim() : "[Error: Sin respuesta de Llama 3]";
+      // Filtro post-IA: si responde fuera de dominio, igual bloquea
+      const finalText = esPreguntaDelSistema(aiContent)
+        ? aiContent
+        : 'Solo puedo responder preguntas relacionadas con el sistema de gestión hospitalaria (usuarios, doctores, pacientes, citas, etc.).';
       const aiResponse = {
         id: Date.now(),
-        text: aiContent,
+        text: finalText,
         sender: 'ai',
         timestamp: new Date(),
       };

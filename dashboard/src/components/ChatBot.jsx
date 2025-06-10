@@ -202,10 +202,13 @@ export default function ChatBot() {
 
     // Solo responder si la pregunta es del sistema
     function esPreguntaDelSistema(texto) {
+      // Palabras clave ampliadas y robustas
       const keywords = [
-        "doctor", "paciente", "administrador", "usuario", "cita", "departamento", "login", "registro",
-        "crear", "eliminar", "modificar", "hospital", "imagen", "correo", "contraseña", "teléfono",
-        "identificación", "departamento médico", "dashboard", "rol", "token", "autenticación", "historial", "especialidad"
+        "doctor", "doctores", "paciente", "pacientes", "administrador", "usuario", "usuarios", "cita", "citas",
+        "departamento", "departamentos", "login", "registro", "crear", "eliminar", "modificar", "hospital",
+        "imagen", "correo", "contraseña", "teléfono", "identificación", "departamento médico", "dashboard", "rol",
+        "token", "autenticación", "historial", "especialidad", "receta", "recetas", "laboratorio", "resultados", "perfil",
+        "sistema", "gestión", "agendar", "cancelar", "consultar", "médico", "médicos"
       ];
       const lower = texto.toLowerCase();
       return keywords.some(k => lower.includes(k));
@@ -217,11 +220,19 @@ export default function ChatBot() {
       ]);
       return;
     }
-    // Respuesta real de Llama 3, pero forzando contexto de sistema
+    // Respuesta real de Llama 3, pero forzando contexto de sistema (y forzando rechazo a temas no relacionados)
     const aiText = await getLlama3Response(
-      `Responde SOLO sobre el sistema de gestión hospitalaria. Si la pregunta no es relevante, di que no puedes responder. Pregunta: ${input}`
+      `IMPORTANTE: Responde ÚNICAMENTE sobre el sistema de gestión hospitalaria (usuarios, doctores, pacientes, citas, historial médico, recetas, resultados de laboratorio, etc). Si la pregunta NO es relevante, responde EXCLUSIVAMENTE: 'Solo puedo responder preguntas relacionadas con el sistema de gestión hospitalaria.' NO cuentes chistes, ni respondas temas generales, ni des información fuera del sistema hospitalario. Pregunta: ${input}`
     );
-    setMessages((prev) => [...prev, { from: "bot", text: aiText }]);
+    // Si la IA por error responde algo fuera de dominio, igual mostramos el mensaje estándar
+    if (!esPreguntaDelSistema(aiText)) {
+      setMessages((prev) => [
+        ...prev,
+        { from: "bot", text: "Solo puedo responder preguntas relacionadas con el sistema de gestión hospitalaria (usuarios, doctores, pacientes, citas, etc.)." }
+      ]);
+    } else {
+      setMessages((prev) => [...prev, { from: "bot", text: aiText }]);
+    }
   };
 
   return (
