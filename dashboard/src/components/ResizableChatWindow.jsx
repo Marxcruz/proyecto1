@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
 import { FaRobot, FaExpand, FaCompress, FaHistory } from "react-icons/fa";
-import * as anime from "animejs";
 
 export default function ResizableChatWindow({
   messages,
@@ -15,12 +14,9 @@ export default function ResizableChatWindow({
   setInput,
   sendMessage,
   input,
-  setOpen
+  setOpen,
+  onImageStepComplete
 }) {
-  // Refs para animejs
-  const sendBtnRef = useRef(null);
-  const iconRef = useRef(null);
-
   // Tamaño y modo expandido
   const [height, setHeight] = useState(420);
   const [width, setWidth] = useState(380);
@@ -78,35 +74,8 @@ export default function ResizableChatWindow({
   // Mostrar historial completo
   const handleShowHistory = () => setShowHistory((prev) => !prev);
 
-  // Animación con animejs al hacer clic en el botón enviar
-  const handleButtonAnime = (e) => {
-    if (sendBtnRef.current) {
-      (anime.default ? anime.default({
-        targets: sendBtnRef.current,
-        scale: [1, 0.85, 1.08, 1],
-        duration: 500,
-        easing: 'easeInOutElastic(1, .7)'
-      }) : anime({
-        targets: sendBtnRef.current,
-        scale: [1, 0.85, 1.08, 1],
-        duration: 500,
-        easing: 'easeInOutElastic(1, .7)'
-      }));
-    }
-    if (iconRef.current) {
-      (anime.default ? anime.default({
-        targets: iconRef.current,
-        rotate: [0, 25, -15, 0],
-        duration: 500,
-        easing: 'easeInOutElastic(1, .7)'
-      }) : anime({
-        targets: iconRef.current,
-        rotate: [0, 25, -15, 0],
-        duration: 500,
-        easing: 'easeInOutElastic(1, .7)'
-      }));
-    }
-  };
+  // Ref para botón enviar (sin animación)
+  const sendBtnRef = useRef(null);
 
   return (
     <div
@@ -202,6 +171,9 @@ export default function ResizableChatWindow({
                     ...prev,
                     { from: "user", text: value.name },
                   ]));
+                  if (typeof onImageStepComplete === 'function') {
+                    onImageStepComplete(value);
+                  }
                 }, 100);
               }}
             >
@@ -223,9 +195,8 @@ export default function ResizableChatWindow({
           className="ml-2 px-4 py-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold rounded-lg shadow-2xl flex items-center gap-2 transition-all duration-200 hover:from-pink-500 hover:to-indigo-500 focus:outline-none focus:ring-4 focus:ring-pink-300 text-base h-full self-stretch relative outline-none ring-0 border-none active:scale-97"
           style={{ minWidth: 56, minHeight: 56, width: 56, height: 56, justifyContent: 'center' }}
           disabled={!input.trim()}
-          onClick={handleButtonAnime}
         >
-          <span className="flex items-center justify-center w-full h-full" ref={iconRef}>
+          <span className="flex items-center justify-center w-full h-full">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10l9-6 9 6-9 6-9-6zm0 10l9-6 9 6M3 10v10m18-10v10" />
             </svg>

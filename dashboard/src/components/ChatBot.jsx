@@ -252,6 +252,35 @@ export default function ChatBot() {
           sendMessage={sendMessage}
           input={input}
           setOpen={setOpen}
+          onImageStepComplete={async file => {
+            // Guardar archivo en creationData
+            setCreationData(prev => ({ ...prev, doctorImage: file }));
+            // Calcular si es el último paso ANTES de avanzar
+            const currentStep = creationStep;
+            const isLastStep = creationMode === "doctor" && currentStep === CREATION_STEPS.doctor.length - 1;
+            if (isLastStep) {
+              setMessages(prev => ([
+                ...prev,
+                { from: "bot", text: "Creando doctor..." }
+              ]));
+              const result = await crearUsuario("doctor", { ...creationData, doctorImage: file });
+              setMessages(prev => ([
+                ...prev,
+                { from: "bot", text: result.message }
+              ]));
+              setCreationMode(null);
+              setCreationStep(0);
+              setCreationData({});
+            } else {
+              setCreationStep(prev => prev + 1);
+              setTimeout(() => {
+                setMessages(prev => ([
+                  ...prev,
+                  { from: "bot", text: `Por favor, ingresa ${CREATION_STEPS.doctor[currentStep + 1].label}:` }
+                ]));
+              }, 300);
+            }
+          }}
         />
       ) : (
         <button
