@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
 import AIChatWindow from "./AIChatWindow"; // Importar el nuevo componente de chat
 import axios from "axios";
 import { Context } from "../main";
@@ -62,75 +62,79 @@ const PatientDashboard = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const fetchPatientData = async () => {
-      try {
-        setLoading(true);
+  const loadAppointments = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Obtener citas del paciente
+      const appointmentsResponse = await axios.get(
+        "http://localhost:3030/api/v1/appointments/my-appointments",
+        { withCredentials: true }
+      );
+
+      if (appointmentsResponse.data.success) {
+        const patientAppointments = appointmentsResponse.data.appointments || [];
+        setAppointments(patientAppointments);
         
-        // Obtener citas del paciente
-        const appointmentsResponse = await axios.get(
-          "http://localhost:3030/api/v1/appointments/my-appointments",
+        // Ordenar citas por fecha
+        const sortedAppointments = [...patientAppointments].sort((a, b) => 
+          new Date(a.fechaCita) - new Date(b.fechaCita)
+        );
+        
+        // Encontrar la próxima cita
+        const today = new Date();
+        const upcomingAppointment = sortedAppointments.find(
+          app => new Date(app.fechaCita) >= today
+        );
+        
+        // Encontrar la última consulta
+        const pastAppointments = sortedAppointments.filter(
+          app => new Date(app.fechaCita) < today && app.estado === "Completada"
+        );
+        const lastConsultation = pastAppointments.length > 0 
+          ? pastAppointments[pastAppointments.length - 1] 
+          : null;
+        
+        // Obtener prescripciones
+        const prescriptionsResponse = await axios.get(
+          "http://localhost:3030/api/v1/prescription/patient-prescriptions",
           { withCredentials: true }
         );
-
-        if (appointmentsResponse.data.success) {
-          const patientAppointments = appointmentsResponse.data.appointments || [];
-          setAppointments(patientAppointments);
+        
+        if (prescriptionsResponse.data.success) {
+          const patientPrescriptions = prescriptionsResponse.data.prescriptions || [];
+          setPrescriptions(patientPrescriptions);
           
-          // Ordenar citas por fecha
-          const sortedAppointments = [...patientAppointments].sort((a, b) => 
-            new Date(a.fechaCita) - new Date(b.fechaCita)
-          );
+          // Contar medicamentos activos
+          const activeCount = patientPrescriptions.filter(
+            p => new Date(p.fechaFin) >= today
+          ).length;
           
-          // Encontrar la próxima cita
-          const today = new Date();
-          const upcomingAppointment = sortedAppointments.find(
-            app => new Date(app.fechaCita) >= today
-          );
-          
-          // Encontrar la última consulta
-          const pastAppointments = sortedAppointments.filter(
-            app => new Date(app.fechaCita) < today && app.estado === "Completada"
-          );
-          const lastConsultation = pastAppointments.length > 0 
-            ? pastAppointments[pastAppointments.length - 1] 
-            : null;
-          
-          // Obtener prescripciones
-          const prescriptionsResponse = await axios.get(
-            "http://localhost:3030/api/v1/prescription/patient-prescriptions",
-            { withCredentials: true }
-          );
-          
-          if (prescriptionsResponse.data.success) {
-            const patientPrescriptions = prescriptionsResponse.data.prescriptions || [];
-            setPrescriptions(patientPrescriptions);
-            
-            // Contar medicamentos activos
-            const activeCount = patientPrescriptions.filter(
-              p => new Date(p.fechaFin) >= today
-            ).length;
-            
-            // Actualizar estadísticas
-            setStats({
-              proximaCita: upcomingAppointment,
-              medicamentosActivos: activeCount,
-              ultimaConsulta: lastConsultation,
-              resultadosPendientes: 0, // Placeholder - implementar cuando haya API de resultados
-              proximosSeguimientos: sortedAppointments.filter(
-                app => new Date(app.fechaCita) >= today && app.tipo === "Seguimiento"
-              ).length
-            });
-          }
+          // Actualizar estadísticas
+          setStats({
+            proximaCita: upcomingAppointment,
+            medicamentosActivos: activeCount,
+            ultimaConsulta: lastConsultation,
+            resultadosPendientes: 0, // Placeholder - implementar cuando haya API de resultados
+            proximosSeguimientos: sortedAppointments.filter(
+              app => new Date(app.fechaCita) >= today && app.tipo === "Seguimiento"
+            ).length
+          });
         }
-      } catch (error) {
-        console.error("Error al obtener datos del paciente:", error);
-        toast.error("Error al cargar la información del paciente");
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Error al obtener datos del paciente:", error);
+      toast.error("Error al cargar la información del paciente");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
+    const fetchPatientData = async () => {
+      await loadAppointments();
+      // Puedes cargar aquí otras cosas (stats etc.)
+    };
     fetchPatientData();
   }, []);
 
@@ -304,7 +308,11 @@ const PatientDashboard = () => {
 
       {/* Ventana de Chat con IA */}
       {isChatOpen && (
-        <AIChatWindow onClose={() => setIsChatOpen(false)} darkMode={darkMode} />
+        <AIChatWindow 
+          onClose={() => setIsChatOpen(false)} 
+          darkMode={darkMode} 
+          onAppointmentCreated={loadAppointments}
+        />
       )}
     </div>
   );

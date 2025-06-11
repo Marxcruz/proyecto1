@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import axios from 'axios';
 import { FaTimes } from 'react-icons/fa';
 import { FiMessageSquare, FiSend } from 'react-icons/fi';
+import { Context } from "../main.jsx";
 
-const AIChatWindow = ({ onClose, darkMode }) => {
+const AIChatWindow = ({ onClose, darkMode, onAppointmentCreated }) => {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [isAiTyping, setIsAiTyping] = useState(false);
@@ -11,6 +12,11 @@ const AIChatWindow = ({ onClose, darkMode }) => {
     { id: Date.now(), text: '¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?', sender: 'ai', timestamp: new Date() },
   ]);
   const [inputText, setInputText] = useState('');
+  // Estado para proceso de creación de cita paso a paso
+  const [creatingAppointment, setCreatingAppointment] = useState(false);
+  const [appointmentStep, setAppointmentStep] = useState(''); // '', 'especialidad', 'fecha', 'hora', 'motivo'
+  const [appointmentDraft, setAppointmentDraft] = useState({ especialidad: '', fecha: '', hora: '', motivo: '' });
+  const { patient } = useContext(Context); // Obtener datos del paciente
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,6 +37,16 @@ const AIChatWindow = ({ onClose, darkMode }) => {
     return keywords.some(k => lower.includes(k));
   }
 
+  function esSolicitudCrearCita(texto) {
+    const patterns = [
+      /crear una cita/i,
+      /agendar una cita/i,
+      /programar una cita/i,
+      /solicitar una cita/i
+    ];
+    return patterns.some((p) => p.test(texto));
+  }
+
   const handleSendMessage = async () => {
     if (inputText.trim() === '') return;
 
@@ -44,6 +60,95 @@ const AIChatWindow = ({ onClose, darkMode }) => {
     setMessages(prevMessages => [...prevMessages, newMessage]);
     setInputText('');
     setIsAiTyping(true);
+
+    // -----------------------------------------------------
+    // Proceso paso a paso de creación de cita
+    if (creatingAppointment) {
+      // Guardar la respuesta del usuario según el paso actual
+      const userReply = newMessage.text.trim();
+
+      if (appointmentStep === 'especialidad') {
+        setAppointmentDraft({ ...appointmentDraft, especialidad: userReply });
+        setAppointmentStep('fecha');
+        setMessages(prev => [...prev, { id: Date.now(), text: '¿Para qué fecha necesitas la cita? (dd/mm/aaaa)', sender: 'ai', timestamp: new Date() }]);
+        setIsAiTyping(false);
+        return;
+      }
+
+      if (appointmentStep === 'fecha') {
+        // Validar formato simple dd/mm/aaaa
+        if (!/^[0-3]?\d\/[0-1]?\d\/\d{4}$/.test(userReply)) {
+          setMessages(prev => [...prev, { id: Date.now(), text: 'Formato de fecha inválido. Usa dd/mm/aaaa', sender: 'ai', timestamp: new Date() }]);
+          setIsAiTyping(false);
+          return;
+        }
+        setAppointmentDraft({ ...appointmentDraft, fecha: userReply });
+        setAppointmentStep('hora');
+        setMessages(prev => [...prev, { id: Date.now(), text: '¿A qué hora? (HH:mm, 24h)', sender: 'ai', timestamp: new Date() }]);
+        setIsAiTyping(false);
+        return;
+      }
+
+      if (appointmentStep === 'hora') {
+        if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(userReply)) {
+          setMessages(prev => [...prev, { id: Date.now(), text: 'Formato de hora inválido. Usa HH:mm (24h)', sender: 'ai', timestamp: new Date() }]);
+          setIsAiTyping(false);
+          return;
+        }
+        setAppointmentDraft({ ...appointmentDraft, hora: userReply });
+        setAppointmentStep('motivo');
+        setMessages(prev => [...prev, { id: Date.now(), text: 'Describe brevemente el motivo de la consulta.', sender: 'ai', timestamp: new Date() }]);
+        setIsAiTyping(false);
+        return;
+      }
+
+      if (appointmentStep === 'motivo') {
+        const draft = { ...appointmentDraft, motivo: userReply };
+        // Convertir a formato YYYY-MM-DD para backend
+        const [day, month, year] = draft.fecha.split('/');
+        const backendDate = `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`;
+
+        try {
+          const payload = {
+            nombre: patient?.nombre || 'Paciente',
+            apellido: patient?.apellido || '',
+            correo: patient?.correo || '',
+            telefono: patient?.telefono || '',
+            identificacion: patient?.identificacion || '',
+            fechaNacimiento: patient?.fechaNacimiento || '',
+            genero: patient?.genero || '',
+            fechaCita: backendDate,
+            horaCita: draft.hora,
+            departamento: draft.especialidad,
+            motivo: draft.motivo,
+          };
+          const { data } = await axios.post('http://localhost:3030/api/v1/appointments/create-appointment', payload, { withCredentials: true });
+          if(data.success && typeof onAppointmentCreated === 'function'){onAppointmentCreated();}
+          setMessages(prev => [...prev, { id: Date.now(), text: data.success ? 'Tu cita ha sido solicitada y está pendiente de aprobación.' : 'No se pudo crear la cita, inténtalo de nuevo.', sender: 'ai', timestamp: new Date() }]);
+        } catch (err) {
+          setMessages(prev => [...prev, { id: Date.now(), text: 'Error al crear la cita, por favor intenta más tarde.', sender: 'ai', timestamp: new Date() }]);
+          console.error('Error creando cita:', err);
+        } finally {
+          // Reset proceso
+          setCreatingAppointment(false);
+          setAppointmentStep('');
+          setAppointmentDraft({ especialidad: '', fecha: '', hora: '', motivo: '' });
+          setIsAiTyping(false);
+        }
+        return;
+      }
+    }
+
+    // -----------------------------------------------------
+    // --- Manejo de solicitud de creación de cita ---
+    if (esSolicitudCrearCita(newMessage.text)) {
+      // Iniciar flujo paso a paso
+      setCreatingAppointment(true);
+      setAppointmentStep('especialidad');
+      setMessages(prev => [...prev, { id: Date.now(), text: '¡Claro! ¿Qué especialidad necesitas?', sender: 'ai', timestamp: new Date() }]);
+      setIsAiTyping(false);
+      return;
+    }
 
     // --- Filtro antes de enviar a la IA ---
     if (!esPreguntaDelSistema(newMessage.text)) {
