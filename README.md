@@ -1,4 +1,4 @@
-# Patient Virtual Assistant & Medical Appointment System
+# Historial clinico, Asistente virtual para pacientes y sistema de citas médicas
 
 Bienvenido al repositorio **proyecto1**, una plataforma integral para la gestión de pacientes y citas médicas que incluye:
 
