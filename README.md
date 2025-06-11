@@ -7,6 +7,16 @@ Bienvenido al repositorio **proyecto1**, una plataforma integral para la gestió
 * Back-end REST API (`server/`) con Node.js, Express y MongoDB.
 * Componentes para doctores y administración (pendientes de documentación extensa).
 
+### Lenguajes y Tecnologías Utilizadas
+
+* **JavaScript (ES6+)** – Lógica del front-end y back-end.
+* **JSX** – Sintaxis para componentes React.
+* **Node.js** – Entorno de ejecución del servidor.
+* **HTML5 & CSS3** – Estructura y estilos base.
+* **Markdown** – Documentación del proyecto.
+* **JSON** – Formato de intercambio de datos (API).
+* **MongoDB Query Language (MQL)** – Consultas a la base de datos.
+
 ---
 
 ## Tabla de Contenidos
@@ -41,7 +51,9 @@ proyecto1
 │   ├── controller    # Lógica de negocio (appointments, users, etc.)
 │   ├── model         # Esquemas Mongoose
 │   └── ...
-└── dashboard         # Front-End React (Vite)
+├── client            # Front-End público (landing, autenticación, etc.)
+│   └── src/
+└── dashboard         # Front-End privado para pacientes
     ├── src/components
     │   ├── AIChatWindow.jsx   # Chatbot
     │   └── PatientDashboard.jsx
@@ -59,25 +71,22 @@ proyecto1
 git clone https://github.com/<usuario>/proyecto1.git
 cd proyecto1
 ```
-2. Instala dependencias del servidor y del dashboard:
+2. Instala TODAS las dependencias desde la raíz con un solo comando:
 ```bash
-# Back-End
-cd server
-npm install
-# Front-End (dashboard)
-cd ../dashboard
-npm install
+npm run install-all
 ```
 3. Configura MongoDB y variables de entorno (ver siguiente sección).
-4. Inicia los servidores de desarrollo en dos terminales:
+4. Arranca **API, Client y Dashboard** simultáneamente:
 ```bash
-# Terminal 1 – servidor
-cd server
-npm run dev
-
-# Terminal 2 – dashboard
-cd ../dashboard
-npm run dev
+npm run dev      # abre API, página principal (client) y dashboard
+# ├─ api       → http://localhost:3030
+# ├─ client    → http://localhost:5173 (o próximo puerto libre)
+# └─ dashboard → http://localhost:5174 (o próximo puerto libre)
+```
+También puedes iniciar combos específicos:
+```bash
+npm run dev:client      # API + client
+npm run dev:dashboard   # API + dashboard
 ```
 El dashboard estará disponible normalmente en `http://localhost:5173` y el API en `http://localhost:3030`.
 
@@ -98,9 +107,12 @@ Ajusta según tu entorno.
 ## Scripts npm importantes
 | Ubicación | Comando | Descripción |
 |-----------|---------|-------------|
-| `server` | `npm run dev` | Inicia servidor con Nodemon |
-| `dashboard` | `npm run dev` | Inicia Vite dev-server |
-| `dashboard` | `npm run build` | Compila frontend para producción |
+| raíz | `npm run install-all` | Instala dependencias de *server*, *client* y *dashboard* |
+| raíz | `npm run dev` | Inicia API + client + dashboard simultáneamente |
+| raíz | `npm run dev:client` | Inicia API + client |
+| raíz | `npm run dev:dashboard` | Inicia API + dashboard |
+| `dashboard` | `npm run build` | Compila frontend del dashboard para producción |
+| `client` | `npm run build` | Compila frontend principal |
 
 ---
 

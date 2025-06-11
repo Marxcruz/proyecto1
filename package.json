@@ -1,0 +1,19 @@
+{
+  "name": "proyecto1-root",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client",
+    "dashboard"
+  ],
+  "scripts": {
+    "install-all": "npm --prefix server install && npm --prefix client install && npm --prefix dashboard install",
+    "dev": "concurrently -k -n api,client,dashboard -c magenta,cyan,green \"npm --prefix server run dev\" \"npm --prefix client run dev\" \"npm --prefix dashboard run dev\"",
+    "dev:client": "concurrently -k -n api,client -c magenta,cyan \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:dashboard": "concurrently -k -n api,dashboard -c magenta,green \"npm --prefix server run dev\" \"npm --prefix dashboard run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.1",
+    "colors": "^1.4.0"
+  }
+}
