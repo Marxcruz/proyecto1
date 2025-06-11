@@ -47,6 +47,18 @@ const AIChatWindow = ({ onClose, darkMode, onAppointmentCreated }) => {
     return patterns.some((p) => p.test(texto));
   }
 
+  function esConsultaCitasConfirmadas(texto) {
+    return /(cu[aá]ntas|cuantos)\s+citas?[^\n]*confirmad(a|as|os|o)/i.test(texto);
+  }
+
+  function esConsultaCitasPendientes(texto) {
+    return /(cu[aá]ntas|cuantos)\s+citas?[^\n]*pendient(e|es)/i.test(texto);
+  }
+
+  function esConsultaCitasCanceladas(texto) {
+    return /(cu[aá]ntas|cuantos)\s+citas?[^\n]*cancelad(a|as|os|o)/i.test(texto);
+  }
+
   const handleSendMessage = async () => {
     if (inputText.trim() === '') return;
 
@@ -120,6 +132,7 @@ const AIChatWindow = ({ onClose, darkMode, onAppointmentCreated }) => {
             fechaCita: backendDate,
             horaCita: draft.hora,
             departamento: draft.especialidad,
+            idPaciente: patient?._id || '',
             motivo: draft.motivo,
           };
           const { data } = await axios.post('http://localhost:3030/api/v1/appointments/create-appointment', payload, { withCredentials: true });
@@ -137,6 +150,43 @@ const AIChatWindow = ({ onClose, darkMode, onAppointmentCreated }) => {
         }
         return;
       }
+    }
+
+    // -----------------------------------------------------
+    // Consulta de citas confirmadas pendientes
+    if (esConsultaCitasConfirmadas(newMessage.text) || esConsultaCitasPendientes(newMessage.text) || esConsultaCitasCanceladas(newMessage.text)) {
+      try {
+        const { data } = await axios.get('http://localhost:3030/api/v1/appointments/my-appointments', { withCredentials: true });
+        if (data.success) {
+          const citas = data.appointments || [];
+          let estadoObjetivo = 'Pendiente';
+          if (esConsultaCitasConfirmadas(newMessage.text)) {
+            estadoObjetivo = 'Confirmada';
+          } else if (esConsultaCitasCanceladas(newMessage.text)) {
+            estadoObjetivo = 'Cancelada';
+          }
+          const filtradas = citas.filter(a => a.estado === estadoObjetivo);
+
+          if (filtradas.length === 0) {
+            setMessages(prev => [...prev, { id: Date.now(), text: `No tienes citas ${estadoObjetivo.toLowerCase()}s.`, sender: 'ai', timestamp: new Date() }]);
+          } else {
+            const listado = filtradas.map((c, idx) => {
+              const f = c.fechaCita ? new Date(c.fechaCita).toLocaleDateString() : '';
+              return `${idx + 1}. Dr. ${c.doctor?.nombre || 'N/A'} ${c.doctor?.apellido || ''} - ${c.departamento || 'Especialidad'} el ${f} a las ${c.horaCita || ''}`;
+            }).join('\n');
+
+            setMessages(prev => [...prev, { id: Date.now(), text: `Tienes ${filtradas.length} cita(s) ${estadoObjetivo.toLowerCase()}s:\n${listado}`, sender: 'ai', timestamp: new Date() }]);
+          }
+        } else {
+          setMessages(prev => [...prev, { id: Date.now(), text: 'No pude obtener tus citas en este momento.', sender: 'ai', timestamp: new Date() }]);
+        }
+      } catch (err) {
+        console.error('Error consultando citas:', err);
+        setMessages(prev => [...prev, { id: Date.now(), text: 'Ocurrió un error al consultar tus citas.', sender: 'ai', timestamp: new Date() }]);
+      } finally {
+        setIsAiTyping(false);
+      }
+      return;
     }
 
     // -----------------------------------------------------
