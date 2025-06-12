@@ -15,6 +15,8 @@ import appointmentRoutes from "./routes/appointmentRoutes.js";
 import healthCheckRoutes from "./routes/healthCheckRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import ollamaRoutes from "./routes/ollamaRoutes.js";
+import clinicalNoteRoutes from "./routes/clinicalNoteRoutes.js";
+import prescriptionRoutes from "./routes/prescriptionRoutes.js";
 import configureSocket from "./socket.js";
 
 const app = express();
@@ -83,6 +85,8 @@ mongoose
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/message", messageRoutes);
 app.use("/api/v1/appointments", appointmentRoutes);
+app.use("/api/v1/clinical-notes", clinicalNoteRoutes);
+app.use("/api/v1/prescriptions", prescriptionRoutes);
 app.use("/api/v1", healthCheckRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/ollama", ollamaRoutes);

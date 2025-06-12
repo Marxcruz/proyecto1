@@ -56,7 +56,7 @@ const RecentAppointments = ({ appointments, loading, darkMode }) => {
                     </td>
                     <td className={`py-2 px-4 border-b ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                       <Link 
-                        to={`/doctor-dashboard/paciente/${appointment.pacienteId}`}
+                        to={`/doctor-dashboard/paciente/${appointment.idPaciente}`}
                         className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
                       >
                         Ver

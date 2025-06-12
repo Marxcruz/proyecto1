@@ -95,32 +95,19 @@ const PatientDashboard = () => {
           ? pastAppointments[pastAppointments.length - 1] 
           : null;
         
-        // Obtener prescripciones
-        const prescriptionsResponse = await axios.get(
-          "http://localhost:3030/api/v1/prescription/patient-prescriptions",
-          { withCredentials: true }
-        );
-        
-        if (prescriptionsResponse.data.success) {
-          const patientPrescriptions = prescriptionsResponse.data.prescriptions || [];
-          setPrescriptions(patientPrescriptions);
-          
-          // Contar medicamentos activos
-          const activeCount = patientPrescriptions.filter(
-            p => new Date(p.fechaFin) >= today
-          ).length;
-          
-          // Actualizar estadísticas
-          setStats({
-            proximaCita: upcomingAppointment,
-            medicamentosActivos: activeCount,
-            ultimaConsulta: lastConsultation,
-            resultadosPendientes: 0, // Placeholder - implementar cuando haya API de resultados
-            proximosSeguimientos: sortedAppointments.filter(
-              app => new Date(app.fechaCita) >= today && app.tipo === "Seguimiento"
-            ).length
-          });
-        }
+        // Prescripciones aún no implementadas en backend; usar lista vacía
+        setPrescriptions([]);
+
+        // Actualizar estadísticas con medicamentosActivos = 0
+        setStats({
+          proximaCita: upcomingAppointment,
+          medicamentosActivos: 0,
+          ultimaConsulta: lastConsultation,
+          resultadosPendientes: 0,
+          proximosSeguimientos: sortedAppointments.filter(
+            app => new Date(app.fechaCita) >= today && app.tipo === "Seguimiento"
+          ).length
+        });
       }
     } catch (error) {
       console.error("Error al obtener datos del paciente:", error);

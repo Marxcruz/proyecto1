@@ -60,7 +60,7 @@ const DoctorDashboard = () => {
           const currentAppointments = appointmentsResponse.data.appointments || [];
           setAppointments(currentAppointments);
           
-          const todayStr = new Date().toISOString().split('T')[0];
+          const todayDate = new Date();
           const lastMonthDate = new Date();
           lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
           lastMonthDate.setHours(0, 0, 0, 0); // Para incluir todo el día del mes anterior
@@ -73,7 +73,7 @@ const DoctorDashboard = () => {
           currentAppointments.forEach(appointment => {
             const appointmentDateObj = new Date(appointment.fechaCita);
             
-            if (appointmentDateObj.toISOString().split('T')[0] === todayStr) {
+            if (appointmentDateObj.toDateString() === todayDate.toDateString()) {
               todayAppointmentsCount++;
             }
             
@@ -84,9 +84,9 @@ const DoctorDashboard = () => {
             }
             
             if (appointmentDateObj >= lastMonthDate) {
-              const patientId = typeof appointment.pacienteId === 'object' && appointment.pacienteId !== null 
-                                ? appointment.pacienteId._id 
-                                : appointment.pacienteId;
+              const patientId = typeof appointment.idPaciente === 'object' && appointment.idPaciente !== null 
+                                ? appointment.idPaciente._id 
+                                : appointment.idPaciente;
               if (patientId) {
                 newPatientsIdSet.add(patientId);
               }

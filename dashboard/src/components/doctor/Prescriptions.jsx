@@ -1,51 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { FaPills, FaPlus, FaTrash, FaFilePdf, FaSearch, FaCalendarAlt } from 'react-icons/fa';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const Prescriptions = ({ darkMode }) => {
   const [patientSearch, setPatientSearch] = useState('');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showPrescriptionForm, setShowPrescriptionForm] = useState(false);
   const [medications, setMedications] = useState([{ nombre: '', dosis: '', frecuencia: '', duracion: '' }]);
-  
-  // Datos de ejemplo
-  const dummyPatients = [
-    { id: 1, nombre: 'María', apellido: 'García', identificacion: '12345678', edad: 45 },
-    { id: 2, nombre: 'Juan', apellido: 'Pérez', identificacion: '87654321', edad: 32 },
-    { id: 3, nombre: 'Ana', apellido: 'López', identificacion: '56781234', edad: 28 }
-  ];
+  const [patients, setPatients] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
 
-  const dummyPrescriptions = [
-    {
-      id: 1,
-      pacienteId: 1,
-      fecha: '2025-05-25',
-      diagnostico: 'Hipertensión arterial',
-      medicamentos: [
-        { nombre: 'Enalapril', dosis: '10mg', frecuencia: '1 vez al día', duracion: '30 días' },
-        { nombre: 'Hidroclorotiazida', dosis: '25mg', frecuencia: '1 vez al día', duracion: '30 días' }
-      ],
-      indicaciones: 'Tomar con el estómago lleno. Control en 1 mes.'
-    },
-    {
-      id: 2,
-      pacienteId: 2,
-      fecha: '2025-05-22',
-      diagnostico: 'Infección respiratoria',
-      medicamentos: [
-        { nombre: 'Amoxicilina', dosis: '500mg', frecuencia: 'Cada 8 horas', duracion: '7 días' },
-        { nombre: 'Paracetamol', dosis: '500mg', frecuencia: 'Cada 6 horas si hay fiebre', duracion: '3 días' }
-      ],
-      indicaciones: 'Completar todo el tratamiento antibiótico aunque mejoren los síntomas.'
+  useEffect(() => {
+    // obtener pacientes del doctor
+    axios.get("http://localhost:3030/api/v1/appointments/doctor-patients", { withCredentials: true })
+      .then(res => setPatients(res.data.patients || []))
+      .catch(err => console.error(err));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPatient) return;
+    axios.get(`http://localhost:3030/api/v1/prescriptions/patient/${selectedPatient._id}`, { withCredentials: true })
+      .then(res => {
+        const processed = (res.data.prescriptions || []).map(p => ({
+          ...p,
+          medicamentos: typeof p.medicamentos === 'string' ? JSON.parse(p.medicamentos) : p.medicamentos,
+        }));
+        setPrescriptions(processed);
+      })
+      .catch(err => console.error(err));
+  }, [selectedPatient]);
+
+  const filteredPatients = patients.filter(patient => `${patient.nombre} ${patient.apellido} ${patient.identificacion}`.toLowerCase().includes(patientSearch.toLowerCase()));
+
+  const patientPrescriptions = prescriptions;
+
+  const formatDate = (iso) => {
+    try {
+      return new Date(iso).toLocaleDateString('es-PE');
+    } catch {
+      return iso;
     }
-  ];
-
-  const filteredPatients = dummyPatients.filter(patient => 
-    `${patient.nombre} ${patient.apellido} ${patient.identificacion}`.toLowerCase().includes(patientSearch.toLowerCase())
-  );
-
-  const patientPrescriptions = selectedPatient 
-    ? dummyPrescriptions.filter(prescription => prescription.pacienteId === selectedPatient.id)
-    : [];
+  };
 
   const addMedicationField = () => {
     setMedications([...medications, { nombre: '', dosis: '', frecuencia: '', duracion: '' }]);
@@ -65,25 +63,66 @@ const Prescriptions = ({ darkMode }) => {
     setMedications(newMedications);
   };
 
-  const handleCreatePrescription = () => {
-    // En un sistema real, esto enviaría la receta al backend
-    console.log("Nueva receta creada:", {
-      pacienteId: selectedPatient?.id,
-      fecha: new Date().toISOString().split('T')[0],
-      medicamentos: medications,
-      indicaciones: document.getElementById('indicaciones').value,
-      diagnostico: document.getElementById('diagnostico').value
-    });
-    
-    // Resetear el formulario
-    setMedications([{ nombre: '', dosis: '', frecuencia: '', duracion: '' }]);
-    setShowPrescriptionForm(false);
+  const handleCreatePrescription = async () => {
+    if (!selectedPatient) return;
+    const titulo = document.getElementById('diagnostico').value;
+    const indicaciones = document.getElementById('indicaciones').value;
+    try {
+      await axios.post(
+        "http://localhost:3030/api/v1/prescriptions/create",
+        {
+          titulo,
+          medicamentos: JSON.stringify(medications),
+          indicaciones,
+          pacienteId: selectedPatient._id,
+        },
+        { withCredentials: true }
+      );
+      toast.success('Prescripción guardada');
+      const res = await axios.get(`http://localhost:3030/api/v1/prescriptions/patient/${selectedPatient._id}`, { withCredentials: true });
+      const processed = (res.data.prescriptions || []).map(p => ({
+        ...p,
+        medicamentos: typeof p.medicamentos === 'string' ? JSON.parse(p.medicamentos) : p.medicamentos,
+      }));
+      setPrescriptions(processed);
+      setShowPrescriptionForm(false);
+      setMedications([{ nombre: '', dosis: '', frecuencia: '', duracion: '' }]);
+    } catch (err) {
+      toast.error('Error al guardar');
+      console.error(err);
+    }
   };
 
   const generatePDF = (prescriptionId) => {
-    // En un sistema real, esta función generaría un PDF de la receta
-    console.log(`Generando PDF para la receta ${prescriptionId}`);
-    alert('Generando PDF de la receta...');
+    const prescription = prescriptions.find(p => p._id === prescriptionId);
+    if (!prescription) return;
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Receta Médica', 105, 15, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text(`Paciente: ${selectedPatient?.nombre} ${selectedPatient?.apellido}`, 14, 30);
+    doc.text(`Identificación: ${selectedPatient?.identificacion || ''}`, 14, 38);
+    doc.text(`Fecha: ${formatDate(prescription.fecha)}`, 14, 46);
+
+    doc.setFontSize(13);
+    doc.text('Medicamentos:', 14, 58);
+
+    const medRows = (prescription.medicamentos || []).map(m => [m.nombre, m.dosis, m.frecuencia, m.duracion]);
+    autoTable(doc, {
+      head: [['Nombre', 'Dosis', 'Frecuencia', 'Duración']],
+      body: medRows,
+      startY: 62,
+      styles: { fontSize: 11 },
+    });
+
+    let y = (doc.lastAutoTable?.finalY) || 62;
+    doc.text('Indicaciones:', 14, y + 10);
+    doc.text(prescription.indicaciones || '', 14, y + 18);
+
+    const fileName = `prescripcion_${selectedPatient?.nombre || ''}_${formatDate(prescription.fecha)}.pdf`;
+    doc.save(fileName);
   };
 
   return (
@@ -128,10 +167,10 @@ const Prescriptions = ({ darkMode }) => {
             <ul className="space-y-2">
               {filteredPatients.map(patient => (
                 <li 
-                  key={patient.id}
+                  key={patient._id || patient.id}
                   onClick={() => setSelectedPatient(patient)}
                   className={`p-3 rounded-lg cursor-pointer flex items-center ${
-                    selectedPatient?.id === patient.id
+                    (selectedPatient?._id || selectedPatient?.id) === (patient._id || patient.id)
                       ? 'bg-blue-500 text-white'
                       : darkMode 
                         ? 'hover:bg-gray-600' 
@@ -140,7 +179,7 @@ const Prescriptions = ({ darkMode }) => {
                 >
                   <div>
                     <p className="font-medium">{patient.nombre} {patient.apellido}</p>
-                    <p className="text-sm">ID: {patient.identificacion} | Edad: {patient.edad}</p>
+                    <p className="text-sm">ID: {patient.identificacion}</p>
                   </div>
                 </li>
               ))}
@@ -319,9 +358,9 @@ const Prescriptions = ({ darkMode }) => {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {patientPrescriptions.map(prescription => (
+                  {patientPrescriptions.map((prescription, idx) => (
                     <div 
-                      key={prescription.id}
+                      key={prescription._id || prescription.id || idx}
                       className={`p-4 rounded-lg border ${
                         darkMode ? 'bg-gray-600 border-gray-500' : 'bg-white border-gray-300'
                       }`}
@@ -330,11 +369,11 @@ const Prescriptions = ({ darkMode }) => {
                         <div>
                           <h4 className="font-medium">{prescription.diagnostico}</h4>
                           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            Fecha: {prescription.fecha}
+                            Fecha: {formatDate(prescription.fecha)}
                           </p>
                         </div>
                         <button
-                          onClick={() => generatePDF(prescription.id)}
+                          onClick={() => generatePDF(prescription._id || prescription.id)}
                           className="flex items-center text-blue-500 hover:text-blue-600"
                         >
                           <FaFilePdf className="mr-1" /> PDF
@@ -346,7 +385,7 @@ const Prescriptions = ({ darkMode }) => {
                           Medicamentos:
                         </h5>
                         <ul className={`list-disc pl-5 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                          {prescription.medicamentos.map((med, idx) => (
+                          {Array.isArray(prescription.medicamentos) && prescription.medicamentos.map((med, idx) => (
                             <li key={idx}>
                               <strong>{med.nombre}</strong> {med.dosis}, {med.frecuencia}, durante {med.duracion}
                             </li>

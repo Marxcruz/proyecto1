@@ -13,7 +13,11 @@
     "dev:dashboard": "concurrently -k -n api,dashboard -c magenta,green \"npm --prefix server run dev\" \"npm --prefix dashboard run dev\""
   },
   "devDependencies": {
-    "concurrently": "^8.0.1",
-    "colors": "^1.4.0"
+    "colors": "^1.4.0",
+    "concurrently": "^8.0.1"
+  },
+  "dependencies": {
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2"
   }
 }

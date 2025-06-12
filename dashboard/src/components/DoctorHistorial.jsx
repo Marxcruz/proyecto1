@@ -9,14 +9,6 @@ const DoctorHistorial = () => {
   const [paciente, setPaciente] = useState(null);
   const [citas, setCitas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [nuevaNota, setNuevaNota] = useState({
-    titulo: "",
-    descripcion: "",
-    diagnostico: "",
-    tratamiento: "",
-    indicaciones: ""
-  });
-  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     const fetchPacienteYCitas = async () => {
@@ -31,7 +23,7 @@ const DoctorHistorial = () => {
 
         // Obtener citas del paciente
         const citasResponse = await axios.get(
-          `http://localhost:3030/api/v1/appointment/patient-appointments/${id}`,
+          `http://localhost:3030/api/v1/appointments/patient-appointments/${id}`,
           { withCredentials: true }
         );
 
@@ -54,61 +46,6 @@ const DoctorHistorial = () => {
       fetchPacienteYCitas();
     }
   }, [id]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNuevaNota(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!nuevaNota.titulo || !nuevaNota.descripcion) {
-      toast.error("Título y descripción son obligatorios");
-      return;
-    }
-
-    try {
-      setGuardando(true);
-      const response = await axios.post(
-        "http://localhost:3030/api/v1/historiales/crear",
-        {
-          ...nuevaNota,
-          pacienteId: id,
-          fecha: new Date().toISOString()
-        },
-        { withCredentials: true }
-      );
-
-      if (response.data.success) {
-        toast.success("Nota clínica guardada exitosamente");
-        setNuevaNota({
-          titulo: "",
-          descripcion: "",
-          diagnostico: "",
-          tratamiento: "",
-          indicaciones: ""
-        });
-        
-        // Recargar las citas para mostrar la nueva nota
-        const citasResponse = await axios.get(
-          `http://localhost:3030/api/v1/appointment/patient-appointments/${id}`,
-          { withCredentials: true }
-        );
-
-        if (citasResponse.data.success) {
-          setCitas(citasResponse.data.appointments || []);
-        }
-      }
-    } catch (error) {
-      console.error("Error al guardar nota clínica:", error);
-      toast.error("Error al guardar la nota clínica");
-    } finally {
-      setGuardando(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -163,10 +100,6 @@ const DoctorHistorial = () => {
                 <span className="font-medium">Fecha de nacimiento:</span>{" "}
                 {new Date(paciente.fechaNacimiento).toLocaleDateString()}
               </p>
-              <p className="text-gray-600 mb-2">
-                <span className="font-medium">Edad:</span>{" "}
-                {new Date().getFullYear() - new Date(paciente.fechaNacimiento).getFullYear()}
-              </p>
             </div>
           </div>
         </div>
@@ -204,95 +137,6 @@ const DoctorHistorial = () => {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Formulario para nueva nota clínica */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">Nueva Nota Clínica</h2>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-gray-700 font-medium mb-2" htmlFor="titulo">
-                Título
-              </label>
-              <input
-                type="text"
-                id="titulo"
-                name="titulo"
-                value={nuevaNota.titulo}
-                onChange={handleChange}
-                className="w-full p-3 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-gray-700 font-medium mb-2" htmlFor="descripcion">
-                Descripción
-              </label>
-              <textarea
-                id="descripcion"
-                name="descripcion"
-                value={nuevaNota.descripcion}
-                onChange={handleChange}
-                rows="3"
-                className="w-full p-3 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              ></textarea>
-            </div>
-            
-            <div>
-              <label className="block text-gray-700 font-medium mb-2" htmlFor="diagnostico">
-                Diagnóstico
-              </label>
-              <textarea
-                id="diagnostico"
-                name="diagnostico"
-                value={nuevaNota.diagnostico}
-                onChange={handleChange}
-                rows="2"
-                className="w-full p-3 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500"
-              ></textarea>
-            </div>
-            
-            <div>
-              <label className="block text-gray-700 font-medium mb-2" htmlFor="tratamiento">
-                Tratamiento
-              </label>
-              <textarea
-                id="tratamiento"
-                name="tratamiento"
-                value={nuevaNota.tratamiento}
-                onChange={handleChange}
-                rows="2"
-                className="w-full p-3 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500"
-              ></textarea>
-            </div>
-            
-            <div>
-              <label className="block text-gray-700 font-medium mb-2" htmlFor="indicaciones">
-                Indicaciones y Recomendaciones
-              </label>
-              <textarea
-                id="indicaciones"
-                name="indicaciones"
-                value={nuevaNota.indicaciones}
-                onChange={handleChange}
-                rows="2"
-                className="w-full p-3 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500"
-              ></textarea>
-            </div>
-            
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={guardando}
-                className={`px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 ${guardando ? 'opacity-70 cursor-not-allowed' : ''}`}
-              >
-                {guardando ? "Guardando..." : "Guardar Nota"}
-              </button>
-            </div>
-          </form>
         </div>
       </div>
     </div>

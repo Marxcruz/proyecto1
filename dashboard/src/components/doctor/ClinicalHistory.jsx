@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { FaFileMedical, FaNotesMedical, FaUserInjured, FaSearch, FaPlusCircle } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 const ClinicalHistory = ({ darkMode }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,72 +14,92 @@ const ClinicalHistory = ({ darkMode }) => {
     tratamiento: '',
     medicamentos: ''
   });
+  const [patients, setPatients] = useState([]);
+  const [loadingPatients, setLoadingPatients] = useState(true);
+  const [patientHistory, setPatientHistory] = useState([]);
 
-  // Datos de ejemplo
-  const dummyPatients = [
-    { id: 1, nombre: 'María', apellido: 'García', identificacion: '12345678', edad: 45 },
-    { id: 2, nombre: 'Juan', apellido: 'Pérez', identificacion: '87654321', edad: 32 },
-    { id: 3, nombre: 'Ana', apellido: 'López', identificacion: '56781234', edad: 28 }
-  ];
+  // Cargar pacientes reales del backend
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const response = await axios.get(
+          'http://localhost:3030/api/v1/appointments/doctor-patients',
+          { withCredentials: true }
+        );
+        if (response.data.success && response.data.patients) {
+          // Normalizar campos para coincidir con el renderizador existente
+          const mapped = response.data.patients.map(p => ({
+            id: p._id,
+            nombre: p.nombre,
+            apellido: p.apellido,
+            identificacion: p.identificacion,
+          }));
+          setPatients(mapped);
+        }
+      } catch (err) {
+        console.error('Error al cargar pacientes:', err);
+      } finally {
+        setLoadingPatients(false);
+      }
+    };
+    fetchPatients();
+  }, []);
 
-  const dummyHistoricalNotes = [
-    { 
-      id: 1, 
-      pacienteId: 1, 
-      fecha: '2025-05-20', 
-      titulo: 'Consulta inicial', 
-      descripcion: 'Paciente acude por dolor abdominal', 
-      diagnostico: 'Gastritis aguda',
-      tratamiento: 'Reposo y dieta blanda',
-      medicamentos: 'Omeprazol 20mg cada 12 horas por 7 días'
-    },
-    { 
-      id: 2, 
-      pacienteId: 1, 
-      fecha: '2025-05-25', 
-      titulo: 'Seguimiento', 
-      descripcion: 'Paciente refiere mejoría parcial del dolor abdominal', 
-      diagnostico: 'Gastritis en resolución',
-      tratamiento: 'Continuar con dieta blanda',
-      medicamentos: 'Continuar Omeprazol 20mg cada 12 horas por 7 días más'
-    },
-    { 
-      id: 3, 
-      pacienteId: 2, 
-      fecha: '2025-05-22', 
-      titulo: 'Consulta por cefalea', 
-      descripcion: 'Paciente con dolor de cabeza intenso de 3 días de evolución', 
-      diagnostico: 'Migraña',
-      tratamiento: 'Reposo en ambiente oscuro y silencioso',
-      medicamentos: 'Ibuprofeno 600mg cada 8 horas si hay dolor'
+  // Cargar notas del paciente cuando selecciona
+  useEffect(() => {
+    const loadNotes = async () => {
+      if (!selectedPatient) return;
+      try {
+        const resp = await axios.get(
+          `http://localhost:3030/api/v1/clinical-notes/patient/${selectedPatient.id}`,
+          { withCredentials: true }
+        );
+        if (resp.data.success) setPatientHistory(resp.data.notes);
+      } catch (e) {
+        console.error('Error obteniendo notas', e);
+      }
+    };
+    loadNotes();
+  }, [selectedPatient]);
+
+  const dummyHistoricalNotes = [];
+
+  const formatDate = (iso) => {
+    try {
+      return new Date(iso).toLocaleDateString('es-PE');
+    } catch {
+      return iso;
     }
-  ];
+  };
 
-  const filteredPatients = dummyPatients.filter(patient => 
+  const filteredPatients = patients.filter(patient => 
     `${patient.nombre} ${patient.apellido} ${patient.identificacion}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const patientHistory = selectedPatient 
-    ? dummyHistoricalNotes.filter(note => note.pacienteId === selectedPatient.id)
-    : [];
-
-  const handleAddNote = () => {
-    // En un sistema real, esto enviaría los datos al backend
-    console.log("Nueva nota:", {
-      ...newNote,
-      pacienteId: selectedPatient?.id,
-      fecha: new Date().toISOString().split('T')[0]
-    });
-    
-    // Resetear el formulario
-    setNewNote({
-      titulo: '',
-      descripcion: '',
-      diagnostico: '',
-      tratamiento: '',
-      medicamentos: ''
-    });
-    setShowAddNoteForm(false);
+  const handleAddNote = async () => {
+    if (!selectedPatient) return;
+    if (!newNote.titulo || !newNote.descripcion) {
+      toast.error('Título y descripción requeridos');
+      return;
+    }
+    try {
+      await axios.post(
+        'http://localhost:3030/api/v1/clinical-notes/create',
+        { ...newNote, pacienteId: selectedPatient.id },
+        { withCredentials: true }
+      );
+      toast.success('Nota guardada');
+      // recargar
+      const resp = await axios.get(
+        `http://localhost:3030/api/v1/clinical-notes/patient/${selectedPatient.id}`,
+        { withCredentials: true }
+      );
+      if (resp.data.success) setPatientHistory(resp.data.notes);
+      setShowAddNoteForm(false);
+      setNewNote({ titulo: '', descripcion: '', diagnostico: '', tratamiento: '', medicamentos: '' });
+    } catch (e) {
+      toast.error('Error al guardar');
+    }
   };
 
   return (
@@ -107,41 +129,45 @@ const ClinicalHistory = ({ darkMode }) => {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Lista de pacientes */}
-        <div className={`md:col-span-1 rounded-lg border ${
-          darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
-        } p-4`}>
-          <h3 className={`text-lg font-medium mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-            Pacientes
-          </h3>
-          
-          {filteredPatients.length === 0 ? (
-            <p className={`text-center py-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              No se encontraron pacientes
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {filteredPatients.map(patient => (
-                <li 
-                  key={patient.id}
-                  onClick={() => setSelectedPatient(patient)}
-                  className={`p-3 rounded-lg cursor-pointer flex items-center ${
-                    selectedPatient?.id === patient.id
-                      ? 'bg-blue-500 text-white'
-                      : darkMode 
-                        ? 'hover:bg-gray-600' 
-                        : 'hover:bg-gray-200'
-                  }`}
-                >
-                  <FaUserInjured className="mr-2" />
-                  <div>
-                    <p className="font-medium">{patient.nombre} {patient.apellido}</p>
-                    <p className="text-sm">ID: {patient.identificacion} | Edad: {patient.edad}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        {loadingPatients ? (
+          <div className={darkMode ? 'text-gray-400' : 'text-gray-500'}>Cargando pacientes...</div>
+        ) : (
+          <div className={`md:col-span-1 rounded-lg border ${
+            darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+          } p-4`}>
+            <h3 className={`text-lg font-medium mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+              Pacientes
+            </h3>
+            
+            {filteredPatients.length === 0 ? (
+              <p className={`text-center py-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                No se encontraron pacientes
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {filteredPatients.map(patient => (
+                  <li 
+                    key={patient.id}
+                    onClick={() => setSelectedPatient(patient)}
+                    className={`p-3 rounded-lg cursor-pointer flex items-center ${
+                      selectedPatient?.id === patient.id
+                        ? 'bg-blue-500 text-white'
+                        : darkMode 
+                          ? 'hover:bg-gray-600' 
+                          : 'hover:bg-gray-200'
+                    }`}
+                  >
+                    <FaUserInjured className="mr-2" />
+                    <div>
+                      <p className="font-medium">{patient.nombre} {patient.apellido}</p>
+                      <p className="text-sm">ID: {patient.identificacion}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         
         {/* Historial del paciente */}
         <div className={`md:col-span-2 rounded-lg border ${
@@ -281,7 +307,7 @@ const ClinicalHistory = ({ darkMode }) => {
                 <div className="space-y-4">
                   {patientHistory.map(note => (
                     <div 
-                      key={note.id}
+                      key={note._id || note.id}
                       className={`p-4 rounded-lg border ${
                         darkMode ? 'bg-gray-600 border-gray-500' : 'bg-white border-gray-300'
                       }`}
@@ -289,7 +315,7 @@ const ClinicalHistory = ({ darkMode }) => {
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-medium">{note.titulo}</h4>
                         <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {note.fecha}
+                          {formatDate(note.fecha)}
                         </span>
                       </div>
                       
